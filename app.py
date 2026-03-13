@@ -453,7 +453,9 @@ class MeshDesktopApp(tk.Tk):
         self._build_marks_tab()
         self._build_homework_tab()
         self._build_notifications_tab()
-
+        ttk.Button(self, text="❗ Сообщить об ошибке", style="Subtle.TButton", command=self.open_bug_report).place(
+            relx=1.0, rely=1.0, x=-14, y=-12, anchor="se"
+        )
         footer = ttk.Frame(self, style="Toolbar.TFrame", padding=(10, 4))
         footer.pack(fill="x", padx=8, pady=(0, 8))
         ttk.Label(
