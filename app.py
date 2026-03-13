@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import json
 import os
 import sys
@@ -405,6 +405,9 @@ class MeshDesktopApp(tk.Tk):
         self.token_var = tk.StringVar()
         self.token_entry = ttk.Entry(toolbar, textvariable=self.token_var, width=82)
         self.token_entry.grid(row=0, column=2, sticky="ew")
+        self.token_entry.bind("<<Paste>>", self._paste_into_token_entry, add="+")
+        self.token_entry.bind("<Shift-Insert>", self._paste_into_token_entry, add="+")
+        self.token_entry.bind("<Control-KeyPress>", self._handle_token_paste_shortcut, add="+")
 
         ttk.Button(toolbar, text="Подключиться", command=self.connect).grid(row=0, column=3, padx=(8, 4))
         ttk.Button(toolbar, text="Получить токен авторизации", command=self.open_token_help).grid(row=0, column=4, padx=(4, 0))
@@ -424,9 +427,15 @@ class MeshDesktopApp(tk.Tk):
         self._build_marks_tab()
         self._build_homework_tab()
         self._build_notifications_tab()
-        ttk.Button(self, text="❗ Сообщить об ошибке", style="Subtle.TButton", command=self.open_bug_report).place(
-            relx=1.0, rely=1.0, x=-14, y=-12, anchor="se"
-        )
+
+        footer = ttk.Frame(self, style="Toolbar.TFrame", padding=(10, 4))
+        footer.pack(fill="x", padx=8, pady=(0, 8))
+        ttk.Label(
+            footer,
+            text="2026. Github janggl. Не является оффициальной версией МЭШ.",
+            style="CardLabel.TLabel",
+        ).pack(side="left")
+        ttk.Button(footer, text="❗ Сообщить об ошибке", style="Subtle.TButton", command=self.open_bug_report).pack(side="right")
 
     def _build_profile_tab(self):
         tab = ttk.Frame(self.notebook)
@@ -539,6 +548,40 @@ class MeshDesktopApp(tk.Tk):
 
     def open_bug_report(self):
         webbrowser.open(BUG_REPORT_URL)
+
+    def _handle_token_paste_shortcut(self, event):
+        key = event.keysym.lower()
+        if event.keycode == 86 or key in {"v", "\u043c"}:
+            return self._paste_into_token_entry()
+        if event.keycode == 65 or key in {"a", "\u0444"}:
+            return self._select_all_token_text()
+        return None
+
+    def _select_all_token_text(self, _event=None):
+        self.token_entry.selection_range(0, tk.END)
+        self.token_entry.icursor(tk.END)
+        return "break"
+
+    def _paste_into_token_entry(self, _event=None):
+        try:
+            clipboard_text = self.clipboard_get()
+        except tk.TclError:
+            return "break"
+
+        try:
+            if self.token_entry.selection_present():
+                start = self.token_entry.index("sel.first")
+                end = self.token_entry.index("sel.last")
+                self.token_entry.delete(start, end)
+                insert_at = start
+            else:
+                insert_at = self.token_entry.index(tk.INSERT)
+        except tk.TclError:
+            insert_at = self.token_entry.index(tk.END)
+
+        self.token_entry.insert(insert_at, clipboard_text)
+        self.token_entry.icursor(insert_at + len(clipboard_text))
+        return "break"
 
     def set_status(self, text: str):
         self.after(0, lambda: self.status_var.set(f"Статус: {text}"))
