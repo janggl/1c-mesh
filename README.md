@@ -6,7 +6,7 @@
 Что это:
 - desktop-приложение на Python + Tkinter;
 - показывает профиль, расписание, оценки, домашние задания и уведомления;
-- использует библиотеку SchoolAPI-main (https://github.com/DavidZhivaev/SchoolAPI/tree/main/SchoolAPI);
+- использует библиотеку SchoolAPI-main (https://github.com/DavidZhivaev/SchoolAPI/tree/main);
 - интерфейс стилизован ближе к 1С:Предприятие.
 
 Как запустить:
