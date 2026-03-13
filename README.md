@@ -1,10 +1,11 @@
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
 
 МЭШ Клиент в стиле 1С
+неоффициальноеприложение МЭШ
 =====================
 
 Что это:
-- desktop-приложение на Python + Tkinter;
+- desktop-приложение на Python + Tkinter, клиент МЭШ для пк;
 - показывает профиль, расписание, оценки, домашние задания и уведомления;
 - использует библиотеку SchoolAPI-main (https://github.com/DavidZhivaev/SchoolAPI/tree/main);
 - интерфейс стилизован ближе к 1С:Предприятие.
