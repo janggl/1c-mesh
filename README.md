@@ -3,6 +3,7 @@
 МЭШ Клиент в стиле 1С,
 неоффициальное приложение МЭШ
 =====================
+<img width="1222" height="792" alt="python_MezD74F8f1" src="https://github.com/user-attachments/assets/6a41f5f6-c355-4124-bc84-d4317efec493" />
 
 Что это:
 - desktop-приложение на Python + Tkinter, клиент МЭШ для пк;
