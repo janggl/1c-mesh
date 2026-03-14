@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import threading
+import subprocess
 import webbrowser
 import aiohttp
 from datetime import date, datetime, timedelta
@@ -437,9 +438,10 @@ class MeshDesktopApp(tk.Tk):
 
         ttk.Button(toolbar, text="Подключиться", command=self.connect).grid(row=0, column=3, padx=(8, 4))
         ttk.Button(toolbar, text="Получить токен авторизации", command=self.open_token_help).grid(row=0, column=4, padx=(4, 0))
+        ttk.Button(toolbar, text="Создать ярлык", command=self.create_desktop_shortcut).grid(row=0, column=5, padx=(8, 0))
 
         self.status_var = tk.StringVar(value="Статус: не подключено")
-        ttk.Label(toolbar, textvariable=self.status_var).grid(row=1, column=0, columnspan=5, sticky="w", pady=(8, 0))
+        ttk.Label(toolbar, textvariable=self.status_var).grid(row=1, column=0, columnspan=6, sticky="w", pady=(8, 0))
         toolbar.columnconfigure(2, weight=1)
 
         footer = ttk.Frame(self, style="Toolbar.TFrame", padding=(10, 4))
@@ -647,6 +649,43 @@ class MeshDesktopApp(tk.Tk):
 
     def open_bug_report(self):
         webbrowser.open(BUG_REPORT_URL)
+
+    def create_desktop_shortcut(self):
+        app_path = Path(__file__).resolve()
+        desktop = Path.home() / "Desktop"
+        shortcut_path = desktop / "1С МЭШ клиент.lnk"
+
+        python_executable = Path(sys.executable)
+        pythonw_executable = python_executable.with_name("pythonw.exe")
+        target_path = pythonw_executable if pythonw_executable.exists() else python_executable
+
+        def ps_quote(value: str) -> str:
+            return value.replace("'", "''")
+
+        command = "\n".join([
+            "$WshShell = New-Object -ComObject WScript.Shell",
+            f"$Shortcut = $WshShell.CreateShortcut('{ps_quote(str(shortcut_path))}')",
+            f"$Shortcut.TargetPath = '{ps_quote(str(target_path))}'",
+            f"$Shortcut.Arguments = '\"{ps_quote(str(app_path))}\"'",
+            f"$Shortcut.WorkingDirectory = '{ps_quote(str(app_path.parent))}'",
+            f"$Shortcut.IconLocation = '{ps_quote(str(target_path))},0'",
+            "$Shortcut.Save()",
+        ])
+
+        try:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except Exception as exc:
+            messagebox.showerror("Ошибка", f"Не удалось создать ярлык: {exc}")
+            self.set_status("ошибка")
+            return
+
+        messagebox.showinfo("Ярлык создан", f"Ярлык создан на рабочем столе:\n{shortcut_path}")
+        self.set_status("ярлык создан")
 
     def _handle_token_paste_shortcut(self, event):
         key = event.keysym.lower()
