@@ -554,8 +554,66 @@ class MeshDesktopApp(tk.Tk):
         ttk.Entry(tools, textvariable=self.hw_to_var, width=16).grid(row=0, column=3, padx=6)
         ttk.Button(tools, text="Загрузить", command=self.load_homeworks).grid(row=0, column=4, padx=(8, 0))
 
-        self.hw_text = scrolledtext.ScrolledText(tab, wrap="word", font=("Tahoma", 9), bg="#ffffff", height=20)
-        self.hw_text.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        summary = ttk.Frame(tab, style="Card.TFrame", padding=10)
+        summary.pack(fill="x", padx=8, pady=(0, 8))
+        ttk.Label(summary, text="Сводка по заданиям", style="SubHeader.TLabel").grid(row=0, column=0, columnspan=6, sticky="ew", pady=(0, 8))
+
+        self.hw_total_var = tk.StringVar(value="0")
+        self.hw_done_var = tk.StringVar(value="0")
+        self.hw_open_var = tk.StringVar(value="0")
+        for idx, (title, var) in enumerate([
+            ("Всего", self.hw_total_var),
+            ("Выполнено", self.hw_done_var),
+            ("Открыто", self.hw_open_var),
+        ]):
+            col = idx * 2
+            ttk.Label(summary, text=f"{title}:", style="CardLabel.TLabel", font=("Tahoma", 9, "bold")).grid(row=1, column=col, sticky="w", padx=(0, 8))
+            ttk.Label(summary, textvariable=var, style="CardLabel.TLabel").grid(row=1, column=col + 1, sticky="w", padx=(0, 18))
+
+        content = ttk.Frame(tab)
+        content.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+
+        list_card = ttk.Frame(content, style="Card.TFrame", padding=10)
+        list_card.pack(side="left", fill="both", expand=True, padx=(0, 4))
+        ttk.Label(list_card, text="Список заданий", style="SubHeader.TLabel").pack(fill="x", pady=(0, 8))
+
+        hw_tree_wrap = ttk.Frame(list_card)
+        hw_tree_wrap.pack(fill="both", expand=True)
+        self.hw_tree = ttk.Treeview(hw_tree_wrap, columns=("date", "subject", "status"), show="headings")
+        for col, title, width in [("date", "Дата", 120), ("subject", "Предмет", 220), ("status", "Статус", 120)]:
+            self.hw_tree.heading(col, text=title)
+            self.hw_tree.column(col, width=width, anchor="w")
+        hw_scroll = ttk.Scrollbar(hw_tree_wrap, orient="vertical", command=self.hw_tree.yview)
+        self.hw_tree.configure(yscrollcommand=hw_scroll.set)
+        self.hw_tree.pack(side="left", fill="both", expand=True)
+        hw_scroll.pack(side="right", fill="y")
+        self.hw_tree.bind("<<TreeviewSelect>>", self._on_homework_select)
+
+        detail_card = ttk.Frame(content, style="Card.TFrame", padding=10)
+        detail_card.pack(side="left", fill="both", expand=True, padx=(4, 0))
+        ttk.Label(detail_card, text="Карточка задания", style="SubHeader.TLabel").pack(fill="x", pady=(0, 8))
+
+        details_meta = ttk.Frame(detail_card, style="Card.TFrame")
+        details_meta.pack(fill="x")
+        self.hw_selected_date_var = tk.StringVar(value="—")
+        self.hw_selected_subject_var = tk.StringVar(value="—")
+        self.hw_selected_status_var = tk.StringVar(value="—")
+        for row, (title, var) in enumerate([
+            ("Дата", self.hw_selected_date_var),
+            ("Предмет", self.hw_selected_subject_var),
+            ("Статус", self.hw_selected_status_var),
+        ]):
+            ttk.Label(details_meta, text=f"{title}:", style="CardLabel.TLabel", font=("Tahoma", 9, "bold")).grid(row=row, column=0, sticky="nw", pady=4, padx=(0, 10))
+            ttk.Label(details_meta, textvariable=var, style="CardLabel.TLabel").grid(row=row, column=1, sticky="nw", pady=4)
+        details_meta.columnconfigure(1, weight=1)
+
+        ttk.Label(detail_card, text="Текст задания", style="SubHeader.TLabel").pack(fill="x", pady=(10, 8))
+        self.hw_detail_text = scrolledtext.ScrolledText(detail_card, wrap="word", font=("Tahoma", 9), bg="#ffffff", height=16)
+        self.hw_detail_text.pack(fill="both", expand=True)
+        self.hw_detail_text.configure(state="disabled")
+
+        self.hw_items_by_row = {}
+        self._set_homework_details(None)
 
     def _build_notifications_tab(self):
         tab = ttk.Frame(self.notebook)
@@ -744,7 +802,7 @@ class MeshDesktopApp(tk.Tk):
             average = (safe_get(item, "average_mark", "average", "avg", "avg_mark", "mean_mark", "mean", "value", "result", default="") or safe_get(item.get("mark", {}) if isinstance(item, dict) else {}, "name", "value") or "—")
             period = safe_get(item, "period_name", "period", "study_period_name", "attestation_period_name", "education_period_name", default="—")
 
-            if average != "?":
+            if average != "—":
                 rows.append((subject, average, period))
 
             nested_items = []
@@ -766,27 +824,82 @@ class MeshDesktopApp(tk.Tk):
         self._run_async(client.homework_for_period(date_from, date_to), self._fill_homeworks)
 
     def _fill_homeworks(self, hw_obj):
-        self.hw_text.delete("1.0", tk.END)
+        for row in self.hw_tree.get_children():
+            self.hw_tree.delete(row)
+
+        self.hw_items_by_row = {}
         items = getattr(hw_obj, "payload", None) or getattr(hw_obj, "homeworks", None) or getattr(hw_obj, "items", [])
         if not items:
-            self.hw_text.insert(tk.END, "Нет данных за выбранный период.")
+            self.hw_total_var.set("0")
+            self.hw_done_var.set("0")
+            self.hw_open_var.set("0")
+            self._set_homework_details({"text": "Нет данных за выбранный период."})
             return
 
-        blocks = []
+        done_count = 0
         for item in items:
-            title = safe_get(item, "subject_name", "title", "homework", default="Без предмета")
-            dt = safe_get(item, "date", "created_at", default="—")
-            text = safe_get(item, "homework", "description", "text", default="—")
-            done = safe_get(item, "is_done", default="—")
-            block = (
-                f"Дата: {dt}\n"
-                f"Предмет: {title}\n"
-                f"Сделано: {done}\n"
-                f"Задание: {text}\n"
-                f"{'-' * 80}\n"
+            status = self._homework_status_text(safe_get(item, "is_done", default="—"))
+            if status == "Да":
+                done_count += 1
+            row_id = self.hw_tree.insert(
+                "",
+                "end",
+                values=(
+                    safe_get(item, "date", "created_at", default="—"),
+                    safe_get(item, "subject_name", "title", "homework", default="Без предмета"),
+                    status,
+                ),
             )
-            blocks.append(block)
-        self.hw_text.insert(tk.END, "\n".join(blocks))
+            self.hw_items_by_row[row_id] = item
+
+        self.hw_total_var.set(str(len(items)))
+        self.hw_done_var.set(str(done_count))
+        self.hw_open_var.set(str(max(len(items) - done_count, 0)))
+
+        first_row = self.hw_tree.get_children()
+        if first_row:
+            self.hw_tree.selection_set(first_row[0])
+            self.hw_tree.focus(first_row[0])
+            self._set_homework_details(self.hw_items_by_row.get(first_row[0]))
+
+    def _on_homework_select(self, _event=None):
+        selection = self.hw_tree.selection()
+        if not selection:
+            self._set_homework_details(None)
+            return
+        self._set_homework_details(self.hw_items_by_row.get(selection[0]))
+
+    def _set_homework_details(self, item):
+        if not item:
+            self.hw_selected_date_var.set("—")
+            self.hw_selected_subject_var.set("—")
+            self.hw_selected_status_var.set("—")
+            details_text = "Выберите задание слева, чтобы открыть его карточку."
+        else:
+            self.hw_selected_date_var.set(safe_get(item, "date", "created_at", default="—"))
+            self.hw_selected_subject_var.set(safe_get(item, "subject_name", "title", "homework", default="Без предмета"))
+            self.hw_selected_status_var.set(self._homework_status_text(safe_get(item, "is_done", default="—")))
+            details_text = safe_get(item, "homework", "description", "text", default="—")
+
+        self.hw_detail_text.configure(state="normal")
+        self.hw_detail_text.delete("1.0", tk.END)
+        self.hw_detail_text.insert(tk.END, details_text)
+        self.hw_detail_text.configure(state="disabled")
+
+    def _homework_status_text(self, value):
+        if isinstance(value, bool):
+            return "Да" if value else "Нет"
+
+        text_value = str(value).strip()
+        if not text_value or text_value == "—":
+            return "—"
+
+        lowered = text_value.lower()
+        if lowered in {"true", "1", "yes", "да"}:
+            return "Да"
+        if lowered in {"false", "0", "no", "нет"}:
+            return "Нет"
+        return text_value
 
     def load_notifications(self):
         client = self.ensure_client()
