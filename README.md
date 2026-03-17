@@ -1,7 +1,7 @@
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
 
 МЭШ Клиент в стиле 1С,
-неоффициальное приложение МЭШ
+неофициальное приложение МЭШ
 =====================
 <img width="631" height="366" alt="Frame 14" src="https://github.com/user-attachments/assets/08d79dd7-afe2-4b7d-8876-5c726cead7bb" />
 
